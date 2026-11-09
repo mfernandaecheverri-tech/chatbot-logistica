@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="UTF-8"?><sqlb_project><db path="logistica.db" readonly="0" foreign_keys="1" case_sensitive_like="0" temp_store="0" wal_autocheckpoint="1000" synchronous="2"/><attached/><window><main_tabs open="structure browser pragmas query" current="0"/></window><tab_structure><column_width id="0" width="300"/><column_width id="1" width="0"/><column_width id="2" width="100"/><column_width id="3" width="3302"/><column_width id="4" width="0"/><expanded_item id="0" parent="1"/><expanded_item id="1" parent="1"/><expanded_item id="2" parent="1"/><expanded_item id="3" parent="1"/></tab_structure><tab_browse><table title="administradores" custom_title="0" dock_id="1" table="4,15:mainadministradores"/><dock_state state="000000ff00000000fd00000001000000020000000000000000fc0100000001fb000000160064006f0063006b00420072006f00770073006500310100000000ffffffff0000011300ffffff000000000000000000000004000000040000000800000008fc00000000"/><default_encoding codec=""/><browse_table_settings/></tab_browse><tab_sql><sql name="SQL 1*">
+-- =========================================
+-- BASE DE DATOS: CHATBOT LOGISTICA
+-- =========================================
+
+PRAGMA foreign_keys = ON;
+
+-- 1. ADMINISTRADORES
+CREATE TABLE IF NOT EXISTS administradores (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    numero_whatsapp TEXT NOT NULL UNIQUE,
+    activo INTEGER DEFAULT 1,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. EVENTOS
+CREATE TABLE IF NOT EXISTS eventos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre TEXT NOT NULL,
+    descripcion TEXT,
+    ubicacion TEXT,
+    fecha_evento TEXT NOT NULL,
+    hora_inicio TEXT,
+    hora_fin TEXT,
+    cupos INTEGER NOT NULL,
+    estado TEXT DEFAULT 'ACTIVO'
+        CHECK (estado IN ('ACTIVO', 'CERRADO', 'CANCELADO')),
+    administrador_id INTEGER,
+    fecha_creacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (administrador_id)
+        REFERENCES administradores(id)
+);
+
+-- 3. PERSONAS
+CREATE TABLE IF NOT EXISTS personas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    nombre_completo TEXT NOT NULL,
+    numero_documento TEXT NOT NULL UNIQUE,
+    numero_whatsapp TEXT NOT NULL,
+    fecha_registro DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. SOLICITUDES
+CREATE TABLE IF NOT EXISTS solicitudes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    persona_id INTEGER NOT NULL,
+    evento_id INTEGER NOT NULL,
+    estado TEXT DEFAULT 'REGISTRADO'
+        CHECK (estado IN (
+            'INTERESADO',
+            'REGISTRADO',
+            'NO_CUMPLE',
+            'DISPONIBLE',
+            'RETIRADO',
+            'SELECCIONADO',
+            'ESPERA'
+        )),
+    fecha_solicitud DATETIME DEFAULT CURRENT_TIMESTAMP,
+    fecha_actualizacion DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (persona_id) REFERENCES personas(id),
+    FOREIGN KEY (evento_id) REFERENCES eventos(id),
+
+    UNIQUE(persona_id, evento_id)
+);
+
+-- 5. PREGUNTAS PERSONALIZADAS POR EVENTO
+CREATE TABLE IF NOT EXISTS preguntas_evento (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    evento_id INTEGER NOT NULL,
+    pregunta TEXT NOT NULL,
+    tipo_respuesta TEXT DEFAULT 'TEXTO',
+    opciones TEXT,
+    obligatoria INTEGER DEFAULT 1,
+    orden INTEGER DEFAULT 1,
+
+    FOREIGN KEY (evento_id) REFERENCES eventos(id)
+);
+
+-- 6. RESPUESTAS DE LAS PERSONAS
+CREATE TABLE IF NOT EXISTS respuestas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    solicitud_id INTEGER NOT NULL,
+    pregunta_id INTEGER NOT NULL,
+    respuesta TEXT,
+
+    FOREIGN KEY (solicitud_id) REFERENCES solicitudes(id),
+    FOREIGN KEY (pregunta_id) REFERENCES preguntas_evento(id),
+
+    UNIQUE(solicitud_id, pregunta_id)
+);
+
+-- =========================================
+-- INDICES PARA OPTIMIZAR CONSULTAS
+-- =========================================
+
+CREATE INDEX IF NOT EXISTS idx_eventos_estado
+ON eventos(estado);
+
+CREATE INDEX IF NOT EXISTS idx_solicitudes_evento
+ON solicitudes(evento_id);
+
+CREATE INDEX IF NOT EXISTS idx_solicitudes_persona
+ON solicitudes(persona_id);
+</sql><current_tab id="0"/></tab_sql></sqlb_project>
