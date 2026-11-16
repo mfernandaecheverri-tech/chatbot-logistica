@@ -1,26 +1,26 @@
 const { run, get, all } = require('./db');
-
-async function crearEvento({ nombre, descripcion, ubicacion, fecha_evento, hora_inicio, hora_fin, cupos, administrador_id }) {
+o
+async function crearEvento({ nombre, descripcion, ubicacion, fecha_evento, hora_inicio, hora_fin, cupo, id_administrador }) {
     const sql = `
-        INSERT INTO eventos (nombre, descripcion, ubicacion, fecha_evento, hora_inicio, hora_fin, cupos, administrador_id)
+        INSERT INTO eventos (id_administrador, nombre, descripcion, ubicacion, fecha_evento, hora_inicio, hora_fin, cupo)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const result = await run(sql, [nombre, descripcion, ubicacion, fecha_evento, hora_inicio, hora_fin, cupos, administrador_id]);
+    const result = await run(sql, [id_administrador, nombre, descripcion, ubicacion, fecha_evento, hora_inicio, hora_fin, cupo]);
     return result.id;
 }
 
-async function consultarEventos(soloActivos = true) {
-    const sql = soloActivos 
-        ? `SELECT * FROM eventos WHERE estado = 'ACTIVO' ORDER BY fecha_evento ASC`
+async function consultarEventos(soloAbiertos = true) {
+    const sql = soloAbiertos 
+        ? `SELECT * FROM eventos WHERE estado = 'ABIERTO' ORDER BY fecha_evento ASC`
         : `SELECT * FROM eventos ORDER BY fecha_evento ASC`;
     return await all(sql);
 }
 
-async function obtenerEventoPorId(id) {
-    return await get(`SELECT * FROM eventos WHERE id = ?`, [id]);
+async function obtenerEventoPorId(id_evento) {
+    return await get(`SELECT * FROM eventos WHERE id_evento = ?`, [id_evento]);
 }
 
-async function actualizarEvento(id, datos) {
+async function actualizarEvento(id_evento, datos) {
     const campos = [];
     const valores = [];
 
@@ -32,23 +32,23 @@ async function actualizarEvento(id, datos) {
     }
     if (campos.length === 0) return 0;
 
-    valores.push(id);
-    const sql = `UPDATE eventos SET ${campos.join(', ')} WHERE id = ?`;
+    valores.push(id_evento);
+    const sql = `UPDATE eventos SET ${campos.join(', ')} WHERE id_evento = ?`;
     const result = await run(sql, valores);
     return result.changes;
 }
 
-async function agregarPreguntaEvento(evento_id, pregunta, tipo_respuesta = 'TEXTO', opciones = null, obligatoria = 1, orden = 1) {
+async function agregarPreguntaEvento(id_evento, texto, tipo_respuesta = 'TEXTO', opciones = null, obligatoria = 1, orden = 1) {
     const sql = `
-        INSERT INTO preguntas_evento (evento_id, pregunta, tipo_respuesta, opciones, obligatoria, orden)
+        INSERT INTO preguntas (id_evento, texto, tipo_respuesta, opciones, obligatoria, orden)
         VALUES (?, ?, ?, ?, ?, ?)
     `;
-    const result = await run(sql, [evento_id, pregunta, tipo_respuesta, opciones, obligatoria, orden]);
+    const result = await run(sql, [id_evento, texto, tipo_respuesta, opciones, obligatoria, orden]);
     return result.id;
 }
 
-async function obtenerPreguntasEvento(evento_id) {
-    return await all(`SELECT * FROM preguntas_evento WHERE evento_id = ? ORDER BY orden ASC`, [evento_id]);
+async function obtenerPreguntasEvento(id_evento) {
+    return await all(`SELECT * FROM preguntas WHERE id_evento = ? ORDER BY orden ASC`, [id_evento]);
 }
 
 module.exports = {

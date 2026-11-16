@@ -1,14 +1,14 @@
 const { run, get } = require('./db');
 
 async function registrarPersona({ nombre_completo, numero_documento, numero_whatsapp }) {
-    const existente = await get(`SELECT id FROM personas WHERE numero_documento = ?`, [numero_documento]);
+    const existente = await get(`SELECT id_persona FROM personas WHERE numero_documento = ?`, [numero_documento]);
     
     if (existente) {
         await run(
-            `UPDATE personas SET nombre_completo = ?, numero_whatsapp = ? WHERE id = ?`,
-            [nombre_completo, numero_whatsapp, existente.id]
+            `UPDATE personas SET nombre_completo = ?, numero_whatsapp = ? WHERE id_persona = ?`,
+            [nombre_completo, numero_whatsapp, existente.id_persona]
         );
-        return existente.id;
+        return existente.id_persona;
     }
 
     const sql = `

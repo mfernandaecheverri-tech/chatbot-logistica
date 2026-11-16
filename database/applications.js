@@ -1,63 +1,72 @@
 const { run, get, all } = require('./db');
 
-async function registrarSolicitud(persona_id, evento_id, estadoInicial = 'REGISTRADO') {
+async function registrarSolicitud(id_persona, id_evento, estadoInicial = 'REGISTRADO') {
     const existente = await get(
-        `SELECT * FROM solicitudes WHERE persona_id = ? AND evento_id = ?`,
-        [persona_id, evento_id]
+        `SELECT * FROM solicitudes WHERE id_persona = ? AND id_evento = ?`,
+        [id_persona, id_evento]
     );
 
     if (existente) {
         if (existente.estado === 'RETIRADO') {
-            await cambiarEstadoSolicitud(existente.id, estadoInicial);
-            return existente.id;
+            await cambiarEstadoSolicitud(existente.id_solicitud, estadoInicial);
+            return existente.id_solicitud;
         }
         throw new Error('La persona ya tiene una solicitud activa para este evento.');
     }
 
-    const sql = `INSERT INTO solicitudes (persona_id, evento_id, estado) VALUES (?, ?, ?)`;
-    const result = await run(sql, [persona_id, evento_id, estadoInicial]);
+    const sql = `INSERT INTO solicitudes (id_persona, id_evento, estado) VALUES (?, ?, ?)`;
+    const result = await run(sql, [id_persona, id_evento, estadoInicial]);
     return result.id;
 }
 
-async function guardarRespuesta(solicitud_id, pregunta_id, respuesta) {
-    const sql = `
-        INSERT INTO respuestas (solicitud_id, pregunta_id, respuesta)
-        VALUES (?, ?, ?)
-        ON CONFLICT(solicitud_id, pregunta_id) DO UPDATE SET respuesta = excluded.respuesta
-    `;
-    const result = await run(sql, [solicitud_id, pregunta_id, respuesta]);
+async function guardarRespuesta(id_solicitud, id_pregunta, valor) {
+    const existente = await get(
+        `SELECT id_respuesta FROM respuestas WHERE id_solicitud = ? AND id_pregunta = ?`,
+        [id_solicitud, id_pregunta]
+    );
+
+    if (existente) {
+        await run(
+            `UPDATE respuestas SET valor = ? WHERE id_respuesta = ?`,
+            [valor, existente.id_respuesta]
+        );
+        return existente.id_respuesta;
+    }
+
+    const sql = `INSERT INTO respuestas (id_solicitud, id_pregunta, valor) VALUES (?, ?, ?)`;
+    const result = await run(sql, [id_solicitud, id_pregunta, valor]);
     return result.id;
 }
 
-async function cambiarEstadoSolicitud(solicitud_id, nuevoEstado) {
+async function cambiarEstadoSolicitud(id_solicitud, nuevoEstado) {
     const sql = `
         UPDATE solicitudes 
         SET estado = ?, fecha_actualizacion = CURRENT_TIMESTAMP 
-        WHERE id = ?
+        WHERE id_solicitud = ?
     `;
-    const result = await run(sql, [nuevoEstado, solicitud_id]);
+    const result = await run(sql, [nuevoEstado, id_solicitud]);
     return result.changes;
 }
 
-async function consultarPersonasPorEstado(evento_id, estado = 'DISPONIBLE') {
+async function consultarPersonasPorEstado(id_evento, estado = 'DISPONIBLE') {
     const sql = `
-        SELECT p.id AS persona_id, p.nombre_completo, p.numero_documento, p.numero_whatsapp,
-               s.id AS solicitud_id, s.estado, s.fecha_solicitud
+        SELECT p.id_persona, p.nombre_completo, p.numero_documento, p.numero_whatsapp,
+               s.id_solicitud, s.estado, s.fecha_registro
         FROM solicitudes s
-        INNER JOIN personas p ON s.persona_id = p.id
-        WHERE s.evento_id = ? AND s.estado = ?
-        ORDER BY s.fecha_solicitud ASC
+        INNER JOIN personas p ON s.id_persona = p.id_persona
+        WHERE s.id_evento = ? AND s.estado = ?
+        ORDER BY s.fecha_registro ASC
     `;
-    return await all(sql, [evento_id, estado]);
+    return await all(sql, [id_evento, estado]);
 }
 
-async function retirarSolicitud(persona_id, evento_id) {
+async function retirarSolicitud(id_persona, id_evento) {
     const sql = `
         UPDATE solicitudes 
         SET estado = 'RETIRADO', fecha_actualizacion = CURRENT_TIMESTAMP 
-        WHERE persona_id = ? AND evento_id = ?
+        WHERE id_persona = ? AND id_evento = ?
     `;
-    const result = await run(sql, [persona_id, evento_id]);
+    const result = await run(sql, [id_persona, id_evento]);
     return result.changes;
 }
 
