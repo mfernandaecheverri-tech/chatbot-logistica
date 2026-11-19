@@ -1,5 +1,5 @@
 const { run, get, all } = require('./db');
-o
+
 async function crearEvento({ nombre, descripcion, ubicacion, fecha_evento, hora_inicio, hora_fin, cupo, id_administrador }) {
     const sql = `
         INSERT INTO eventos (id_administrador, nombre, descripcion, ubicacion, fecha_evento, hora_inicio, hora_fin, cupo)
