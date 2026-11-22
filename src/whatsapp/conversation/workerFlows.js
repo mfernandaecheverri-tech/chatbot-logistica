@@ -31,9 +31,9 @@ function crearWorkerFlows({ obtenerMenu, regresarMenu }) {
         }).join(', ');
     }
 
-    // Convierte el identificador numérico en un código EV001.
+    // Convierte el identificador numérico en un código EV0001.
     function formatearCodigoEvento(id) {
-        return `EV${String(id).padStart(3, '0')}`;
+        return `EV${String(id).padStart(4, '0')}`;
     }
 
     // Convierte el identificador de solicitud en un código de inscripción.
@@ -69,7 +69,7 @@ function crearWorkerFlows({ obtenerMenu, regresarMenu }) {
 
         return 'Vamos a iniciar tu inscripción.\n\n' +
             '¿A qué convocatoria deseas inscribirte? Escribe el código del evento.\n\n' +
-            'Ejemplo: EV001';
+            'Ejemplo: EV0001';
     }
 
 
@@ -439,7 +439,7 @@ function crearWorkerFlows({ obtenerMenu, regresarMenu }) {
                 const idEvento = obtenerIdDesdeCodigo(respuesta);
 
                 if (!idEvento) {
-                    return 'El código no es válido. Escribe un código como EV001.';
+                    return 'El código no es válido. Escribe un código como EV0001.';
                 }
 
                 const evento = await obtenerEventoPorId(idEvento);
@@ -698,7 +698,7 @@ function crearWorkerFlows({ obtenerMenu, regresarMenu }) {
     Consulta las convocatorias que se encuentran abiertas.
 
     2. INSCRIBIRME A UN EVENTO
-    Escribe el código de la convocatoria (por ejemplo, EV001).
+    Escribe el código de la convocatoria (por ejemplo, EV0001).
     Deberás aceptar todas las fechas del evento, proporcionar tus datos personales si es necesario y responder las preguntas configuradas.
     Al finalizar, confirma tu inscripción.
 

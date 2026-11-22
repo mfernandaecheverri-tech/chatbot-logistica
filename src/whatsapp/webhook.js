@@ -98,6 +98,27 @@ async function procesarMensajeEntrante(message) {
         // Enviar el mensaje recibido al motor conversacional de Nane.
         const respuesta = await procesarMensaje(remitente, contenido);
 
+        // Si el motor devuelve un documento, enviarlo como archivo.
+        if (
+            respuesta &&
+            typeof respuesta === "object" &&
+            respuesta.tipo === "documento"
+        ) {
+            await sendMessage.sendDocument(
+                remitente,
+                respuesta.rutaArchivo,
+                respuesta.caption
+            );
+
+            console.log("CSV enviado correctamente:", respuesta.nombreArchivo);
+
+            // Después del documento, enviar la confirmación y el menú.
+            await sendMessage(remitente, respuesta.mensaje);
+
+            return;
+        }
+
+        // Si la respuesta es texto se envia como mensaje normal.
         if (typeof respuesta !== "string" || !respuesta.trim()) {
             console.warn("El motor conversacional no generó una respuesta.");
             return;
@@ -105,7 +126,6 @@ async function procesarMensajeEntrante(message) {
 
         console.log("Respuesta generada por el chatbot:", respuesta);
 
-        // Enviar por WhatsApp la respuesta del motor conversacional.
         await sendMessage(remitente, respuesta);
 
         console.log("Respuesta enviada correctamente a:", remitente);
