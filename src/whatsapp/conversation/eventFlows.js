@@ -4,9 +4,103 @@ const { normalizarMensaje } = require('./commands');
 const {crearEvento, agregarPreguntaEvento, consultarEventos, obtenerEventoPorId, actualizarEvento} = require('../../../database/events');
 const {validarHora, validarTexto, validarNumeroPositivo, convertirListaFechas, formatearFechas} = require('./validators');
 const { get } = require('../../../database/db');
+const { exportarEventoCSV } = require('../../../database/reports');
 
 // Recibe las funciones del router que necesita.
 function crearEventFlows({ obtenerMenu, regresarMenu }) {
+    // Convierte el ID numérico en un código EV0001.
+    function formatearCodigoEvento(id) {
+        return `EV${String(id).padStart(4, '0')}`;
+    }
+
+    // Inicia el flujo para consultar y exportar los inscritos.
+    async function iniciarVerInscritos(numero, sesion) {
+
+        const administrador = await get(
+            `SELECT id_administrador
+            FROM administradores
+            WHERE numero_whatsapp = ? AND activo = 1`,
+            [numero]
+        );
+
+        if (!administrador) {
+            return 'No tienes autorización para consultar los inscritos.';
+        }
+
+        sesion.flujo = 'VER_INSCRITOS';
+        sesion.etapa = 'CODIGO_EVENTO';
+
+        sesion.datosReporte = {
+            id_administrador: administrador.id_administrador
+        };
+
+        return 'CONSULTAR INSCRITOS\n\n' +
+            'Escribe el código del evento del cual deseas consultar los inscritos.\n\n' +
+            'Ejemplo: EV0001\n\n' +
+            'Escribe MENU para regresar al menú principal.';
+    }
+
+
+    // Procesa el código del evento y genera el CSV.
+    async function procesarVerInscritos(sesion, mensaje) {
+
+        const respuesta = mensaje.trim();
+
+        try {
+            if (sesion.etapa !== 'CODIGO_EVENTO') {
+                regresarMenu(sesion);
+
+                return 'La etapa de consulta no es válida.\n\n' +
+                    obtenerMenu(sesion.rol);
+            }
+
+            const coincidencia = respuesta.match(/^(?:EV)?0*(\d+)$/i);
+
+            if (!coincidencia) {
+                return 'Código no válido. Escribe uno como EV0001.';
+            }
+
+            const idEvento = Number(coincidencia[1]);
+
+            if (!Number.isSafeInteger(idEvento) || idEvento <= 0) {
+                return 'El código del evento no es válido. Inténtalo nuevamente.';
+            }
+
+            const evento = await obtenerEventoPorId(idEvento);
+
+            if (!evento) {
+                return 'No encontramos ese evento. Verifica el código e inténtalo nuevamente.';
+            }
+
+            // Generar el archivo con todos los inscritos.
+            const resultado = await exportarEventoCSV(idEvento);
+
+            const nombreArchivo = require('path').basename(
+                resultado.rutaArchivo
+            );
+
+            regresarMenu(sesion);
+
+            return {
+                tipo: 'documento',
+                rutaArchivo: resultado.rutaArchivo,
+                nombreArchivo,
+                caption: `Inscritos del evento ${formatearCodigoEvento(idEvento)} - ${evento.nombre}. Total de registros: ${resultado.totalExportados}.`,
+                mensaje: `El archivo CSV del evento ${formatearCodigoEvento(idEvento)} fue generado correctamente.\n\n` +
+                    `Total de registros exportados: ${resultado.totalExportados}.\n\n` +
+                    obtenerMenu(sesion.rol)
+            };
+
+        } catch (error) {
+            console.error('Error al generar reporte de inscritos:', error.message);
+
+            regresarMenu(sesion);
+
+            return 'Ocurrió un error al generar el archivo CSV. Inténtalo nuevamente.\n\n' +
+                obtenerMenu(sesion.rol);
+        }
+    }
+
     // Consulta y muestra los eventos según el rol.
     async function mostrarEventos(rol) {
         try {
@@ -30,7 +124,7 @@ function crearEventFlows({ obtenerMenu, regresarMenu }) {
                     ? formatearFechas(fechas)
                     : 'No disponibles';
 
-                return `EVENTO #${evento.id_evento}
+                return `EVENTO ${formatearCodigoEvento(evento.id_evento)}
 
 Nombre: ${evento.nombre}
 Descripción: ${evento.descripcion || 'Sin descripción'}
@@ -106,11 +200,11 @@ ${obtenerMenu(rol)}`;
             };
 
             const listado = eventos.map(evento =>
-                `${`EV${String(evento.id_evento).padStart(3, '0')}`} - ${evento.nombre} (${evento.estado})`
+                `${formatearCodigoEvento(evento.id_evento)} - ${evento.nombre} (${evento.estado})`
             ).join('\n');
 
             return `¿Qué evento deseas editar?\n\n${listado}\n\n` +
-                'Escribe el código del evento, por ejemplo EV001.';
+                'Escribe el código del evento, por ejemplo EV0001.';
 
         } catch (error) {
             console.error('Error al iniciar edición:', error.message);
@@ -130,7 +224,7 @@ ${obtenerMenu(rol)}`;
 
         return `EVENTO SELECCIONADO
 
-    Código: EV${String(evento.id_evento).padStart(3, '0')}
+    Código: ${formatearCodigoEvento(evento.id_evento)}
     Nombre: ${evento.nombre}
     Descripción: ${evento.descripcion || 'Sin descripción'}
     Ubicación: ${evento.ubicacion || 'No especificada'}
@@ -166,7 +260,7 @@ ${obtenerMenu(rol)}`;
                     const coincidencia = respuesta.match(/^(?:EV)?0*(\d+)$/i);
 
                     if (!coincidencia) {
-                        return 'Código no válido. Escribe uno como EV001.';
+                        return 'Código no válido. Escribe uno como EV0001.';
                     }
 
                     const idEvento = Number(coincidencia[1]);
@@ -310,7 +404,7 @@ ${obtenerMenu(rol)}`;
 
                     return `¡Evento actualizado correctamente!
 
-    Código: EV${String(datos.evento.id_evento).padStart(3, '0')}
+    Código: ${formatearCodigoEvento(datos.evento.id_evento)}
     Campo modificado: ${datos.campo}
 
     ${obtenerMenu(sesion.rol)}`;
@@ -362,11 +456,11 @@ ${obtenerMenu(rol)}`;
             };
 
             const listado = eventos.map(evento =>
-                `EV${String(evento.id_evento).padStart(3, '0')} - ${evento.nombre} - ${evento.estado}`
+                `${formatearCodigoEvento(evento.id_evento)} - ${evento.nombre} - ${evento.estado}`
             ).join('\n\n');
 
             return `Estos son los eventos registrados:\n\n${listado}\n\n` +
-                'Escribe el código del evento que deseas cerrar, por ejemplo EV001.';
+                'Escribe el código del evento que deseas cerrar, por ejemplo EV0001.';
 
         } catch (error) {
             console.error('Error al iniciar cierre de evento:', error.message);
@@ -388,7 +482,7 @@ ${obtenerMenu(rol)}`;
                     const coincidencia = respuesta.match(/^(?:EV)?0*(\d+)$/i);
 
                     if (!coincidencia) {
-                        return 'Código no válido. Escribe uno como EV001.';
+                        return 'Código no válido. Escribe uno como EV0001.';
                     }
 
                     const idEvento = Number(coincidencia[1]);
@@ -417,7 +511,7 @@ ${obtenerMenu(rol)}`;
 
                     return `INFORMACIÓN DEL EVENTO
 
-Código: EV${String(evento.id_evento).padStart(3, '0')}
+Código: ${formatearCodigoEvento(datos.evento.id_evento)}
 Nombre: ${evento.nombre}
 Descripción: ${evento.descripcion || 'Sin descripción'}
 Ubicación: ${evento.ubicacion || 'No especificada'}
@@ -476,9 +570,9 @@ Responde SI o NO.`;
                             obtenerMenu(sesion.rol);
                     }
 
-                    return `¡El evento EV${String(datos.evento.id_evento).padStart(3, '0')} ha sido cerrado correctamente!
+                    return `¡El evento ${formatearCodigoEvento(datos.evento.id_evento)} ha sido cerrado correctamente!
 
-Código: EV${String(datos.evento.id_evento).padStart(3, '0')}
+Código: ${formatearCodigoEvento(datos.evento.id_evento)}
 Nombre: ${datos.evento.nombre}
 Nuevo estado: CERRADO
 
@@ -707,7 +801,7 @@ Responde SI para confirmar o NO para cancelar.`;
 
                     return `¡Evento creado exitosamente!
 
-Identificador del evento: ${eventoId}
+Código del evento: ${formatearCodigoEvento(eventoId)}
 
 El evento quedó registrado en estado ABIERTO.
 
@@ -731,7 +825,7 @@ ${obtenerMenu(sesion.rol)}`;
     }
 
     return {mostrarEventos, iniciarCreacionEvento, procesarCreacionEvento, iniciarEdicionEvento, procesarEdicionEvento, iniciarCierreEvento,
-    procesarCierreEvento};
+    procesarCierreEvento, iniciarVerInscritos, procesarVerInscritos};
 }
 
 module.exports = { crearEventFlows };

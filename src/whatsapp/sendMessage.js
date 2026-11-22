@@ -1,3 +1,5 @@
+const fs = require("fs");
+const path = require("path");
 
 function normalizarNumero(numero) {
     return String(numero || "").replace(/\D/g, "");
@@ -95,4 +97,100 @@ async function sendMessage(to, message) {
     }
 }
 
+async function sendDocument(to, rutaArchivo, caption = "") {
+    const token = process.env.WHATSAPP_TOKEN;
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const apiVersion = process.env.WHATSAPP_API_VERSION;
+
+    if (!token || !phoneNumberId || !apiVersion) {
+        throw new Error("Faltan variables de configuración de WhatsApp");
+    }
+
+    const destinatario = normalizarNumero(to);
+
+    if (!/^\d{8,15}$/.test(destinatario)) {
+        throw new Error("El número del destinatario no tiene un formato válido");
+    }
+
+    const autorizados = obtenerDestinatariosAutorizados();
+
+    if (autorizados.size === 0 || !autorizados.has(destinatario)) {
+        throw new Error("Envío de documento bloqueado: destinatario no autorizado");
+    }
+
+    if (!rutaArchivo || !fs.existsSync(rutaArchivo)) {
+        throw new Error("No se encontró el archivo que se desea enviar");
+    }
+
+    const nombreArchivo = path.basename(rutaArchivo);
+
+    if (path.extname(nombreArchivo).toLowerCase() !== ".csv") {
+        throw new Error("El archivo debe tener formato CSV");
+    }
+
+    const contenido = await fs.promises.readFile(rutaArchivo);
+
+    const formulario = new FormData();
+
+    formulario.append("messaging_product", "whatsapp");
+    formulario.append(
+        "file",
+        new Blob([contenido], { type: "text/csv" }),
+        nombreArchivo
+    );
+
+    const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/media`;
+
+    // Primero se carga el archivo a Meta.
+    const respuestaCarga = await fetch(url, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${token}`
+        },
+        body: formulario
+    });
+
+    const datosCarga = await respuestaCarga.json();
+
+    if (!respuestaCarga.ok || !datosCarga.id) {
+        console.error("Error al cargar el CSV:", datosCarga);
+        throw new Error("No fue posible cargar el documento a WhatsApp");
+    }
+
+    // Después se envía el documento al administrador.
+    const respuestaEnvio = await fetch(
+        `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`,
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                messaging_product: "whatsapp",
+                recipient_type: "individual",
+                to: destinatario,
+                type: "document",
+                document: {
+                    id: datosCarga.id,
+                    filename: nombreArchivo,
+                    caption: caption
+                }
+            })
+        }
+    );
+
+    const datosEnvio = await respuestaEnvio.json();
+
+    if (!respuestaEnvio.ok) {
+        console.error("Error al enviar el CSV:", datosEnvio);
+        throw new Error("WhatsApp no pudo enviar el documento");
+    }
+
+    console.log("Documento enviado correctamente a:", destinatario);
+
+    return datosEnvio;
+}
+
 module.exports = sendMessage;
+module.exports.sendDocument = sendDocument;

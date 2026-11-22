@@ -45,6 +45,7 @@ function regresarMenu(sesion) {
     delete sesion.datosEdicionEvento;
     delete sesion.datosCancelacion;
     delete sesion.datosCierreEvento;
+    delete sesion.datosReporte;
 }
 
 // Crear las funciones del flujo de trabajadores.
@@ -128,6 +129,10 @@ async function procesarMensaje(numeroWhatsapp, mensaje) {
     if (sesion.flujo === 'CERRAR_EVENTO') {
         return await eventFlows.procesarCierreEvento(sesion, mensaje);
     }
+    // Procesar consulta de inscritos.
+    if (sesion.flujo === 'VER_INSCRITOS') {
+        return await eventFlows.procesarVerInscritos(sesion, mensaje);
+    }
     // Procesar inscripción de trabajadores.
     if (sesion.flujo === 'INSCRIBIR_EVENTO') {
         return await workerFlows.procesarInscripcion(sesion, mensaje);
@@ -170,7 +175,13 @@ async function procesarMensaje(numeroWhatsapp, mensaje) {
         ) {
             return await eventFlows.iniciarCierreEvento(numero, sesion);
         }
-
+        // Iniciar consulta de inscritos.
+        if (
+            seleccion.flujo === 'VER_INSCRITOS' &&
+            sesion.rol === 'ADMIN'
+        ) {
+            return await eventFlows.iniciarVerInscritos(numero, sesion);
+        }
         // Iniciar inscripción de trabajadores.
         if (
             seleccion.flujo === 'INSCRIBIR_EVENTO' &&
