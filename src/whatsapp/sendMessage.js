@@ -133,9 +133,10 @@ async function sendDocument(to, rutaArchivo, caption = "") {
     const formulario = new FormData();
 
     formulario.append("messaging_product", "whatsapp");
+    formulario.append("type", "application/vnd.ms-excel");
     formulario.append(
         "file",
-        new Blob([contenido], { type: "text/csv" }),
+        new Blob([contenido], { type: "application/vnd.ms-excel" }),
         nombreArchivo
     );
 
